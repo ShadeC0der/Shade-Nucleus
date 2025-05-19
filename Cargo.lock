@@ -377,6 +377,9 @@ dependencies = [
 [[package]]
 name = "demo"
 version = "0.1.0"
+dependencies = [
+ "nucleus",
+]
 
 [[package]]
 name = "dispatch"
