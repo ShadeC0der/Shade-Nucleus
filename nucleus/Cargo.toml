@@ -1,10 +1,10 @@
 [package]
 name = "nucleus"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-winit       = "0.29"
-pixels      = "0.13"
-log         = "0.4"
-env_logger  = "0.10"
+winit      = { workspace = true }
+wgpu       = { workspace = true }
+anyhow     = { workspace = true }
+log        = { workspace = true }
