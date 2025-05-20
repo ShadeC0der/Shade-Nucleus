@@ -1,27 +1,38 @@
 # Shade Nucleus
 
-*Motor gráfico escrito en Rust — creado totalmente desde cero.*
+*Motor gráfico 2D escrito en Rust — creado totalmente desde cero.*
 
-> **Estado:** prototipo inicial (v0.1.0)  
-> **Workspace:** `nucleus/` (lib) + `demo/` (ejecutable de prueba)
+> **Estado actual:** prototipo funcional (`v0.2.0`)  
+> **Estructura:** `nucleus/` (núcleo del motor) + `demo/` (ejecutable de prueba)
 
-## ¿Qué hay dentro?
+---
 
-| Carpeta | Rol |
-|---------|-----|
-| **nucleus/** | Crate **lib** que contiene el núcleo del motor: ventana, framebuffer RGBA, primitivas básicas (`clear`, `draw_pixel`, etc.). |
-| **demo/**    | Crate **bin** que usa `nucleus` para mostrar una figura en pantalla; sirve como testeo de las capacidades actuales. |
+## 🚧 ¿Qué incluye esta versión?
 
-## Objetivo a corto plazo
+| Carpeta      | Rol                                                                 |
+|--------------|----------------------------------------------------------------------|
+| **nucleus/** | Crate **lib** con el núcleo gráfico: configuración de GPU, ventana, surface, renderer y motor base (`Engine`). |
+| **demo/**    | Crate **bin** de prueba. Muestra una ventana con un color animado dinámicamente. Sirve como punto de partida para futuras escenas. |
 
-1. Mostrar una ventana 320×240 y dibujar figuras simples **generadas por el propio motor**.  
+---
 
-## Cómo compilar / probar
+## 🎯 Objetivo actual
+
+- Establecer una arquitectura modular y escalable.
+- Separar la lógica (`Engine`) del renderizado (`Renderer`).
+- Preparar el entorno para futuras escenas, perfiles gráficos y lógica avanzada.
+
+---
+
+## 🚀 Cómo compilar y ejecutar
+
+En la ruta `/demo` ejecutar los siguientes comandos:
 
 ```bash
-# compila todo
+# Compilar todo el workspace
 cargo build
-
-# ejecuta la demo de prueba
+```
+```bash
+# Ejecutar la demo básica
 cargo run -p demo
 ```
