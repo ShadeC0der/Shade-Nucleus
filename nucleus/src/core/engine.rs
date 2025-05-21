@@ -40,7 +40,7 @@ impl Engine {
         if self.fps_update_timer >= Duration::from_secs(1) {
             self.current_fps = self.frame_count as f32 / self.fps_update_timer.as_secs_f32();
             self.frame_count = 0;
-            self.fps_update_timer -= Duration::from_secs(1); // Subtract, don't reset to zero, to carry over remainder
+            self.fps_update_timer -= Duration::from_secs(1);
         }
     }
 
@@ -51,7 +51,8 @@ impl Engine {
 
     /// Solicita al renderer que dibuje el frame actual.
     pub fn render(&mut self, window: &Window) -> Result<()> {
-        let gpu_name = &self.renderer.wgpu_context.adapter.get_info().name;
-        self.renderer.render(self.clear_t, window, self.current_fps, gpu_name)
+        let gpu_name = self.renderer.gpu_name(); // ✅ Usamos el método público
+        self.renderer.render(self.clear_t, window, self.current_fps, &gpu_name)
     }
+
 }

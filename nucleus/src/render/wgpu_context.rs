@@ -3,7 +3,6 @@ use wgpu::{
     Device, DeviceDescriptor, Features, Instance, Limits, PowerPreference, Queue,
     RequestAdapterOptions, Adapter,
 };
-use winit::window::Window;
 
 /// Encapsulates WGPU's core components: Instance, Adapter, Device, and Queue.
 pub struct WgpuContext {
