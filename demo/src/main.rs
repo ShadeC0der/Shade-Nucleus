@@ -7,8 +7,6 @@ use anyhow::Context;
 use nucleus::Engine;
 use pollster::block_on;
 
-
-
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -27,10 +25,13 @@ fn main() -> anyhow::Result<()> {
 
         match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                let egui_consumed_event = engine.renderer.egui_state.on_window_event(&window, &event);
+                // ✅ Usamos on_event con el contexto de egui
+                let egui_consumed_event =
+                    engine.renderer.egui_state.on_event(&engine.renderer.egui_ctx, &event);
                 if egui_consumed_event.consumed {
                     return;
                 }
+
                 match event {
                     WindowEvent::CloseRequested =>
                         *control_flow = ControlFlow::ExitWithCode(0),
@@ -43,21 +44,24 @@ fn main() -> anyhow::Result<()> {
 
                     _ => {}
                 }
-            },
+            }
 
             Event::MainEventsCleared => {
                 engine.update();
 
-                // Aquí claramente manejas cualquier error usando anyhow:
-                if let Err(e) = engine.render(&window) { // Pass window reference
+                if let Err(e) = engine.render(&window) {
                     eprintln!("Error al renderizar: {:?}", e);
-                    // Handle specific errors like SurfaceError::Lost if necessary
+
                     if let Some(wgpu::SurfaceError::Lost) = e.downcast_ref::<wgpu::SurfaceError>() {
-                        engine.resize(engine.renderer.surface_manager.width(), engine.renderer.surface_manager.height());
-                    } else if let Some(wgpu::SurfaceError::OutOfMemory) = e.downcast_ref::<wgpu::SurfaceError>() {
-                        *control_flow = ControlFlow::ExitWithCode(1); // Or specific exit for OOM
+                        engine.resize(
+                            engine.renderer.surface_width(),
+                            engine.renderer.surface_height(),
+                        );
+                    } else if let Some(wgpu::SurfaceError::OutOfMemory) =
+                        e.downcast_ref::<wgpu::SurfaceError>()
+                    {
+                        *control_flow = ControlFlow::ExitWithCode(1);
                     }
-                    // For other errors, you might log and continue or exit depending on severity
                 }
             }
 
