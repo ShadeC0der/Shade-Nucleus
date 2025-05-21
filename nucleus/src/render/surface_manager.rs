@@ -65,4 +65,12 @@ impl SurfaceManager {
     pub fn surface_format(&self) -> TextureFormat {
         self.config.format
     }
+
+    pub fn width(&self) -> u32 {
+        self.config.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.config.height
+    }
 }

@@ -141,7 +141,7 @@ impl Renderer {
         
         // Update egui wgpu renderer
         let screen_descriptor = egui_wgpu::ScreenDescriptor {
-            size_in_pixels: [self.surface_manager.config.width, self.surface_manager.config.height],
+            size_in_pixels: [self.surface_manager.width(), self.surface_manager.height()],
             pixels_per_point: window.scale_factor() as f32, // Use current scale factor
         };
 
