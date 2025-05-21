@@ -77,7 +77,9 @@ impl Renderer {
 
         let scale_factor = window.scale_factor();
         let max_texture_side = wgpu_context.device.limits().max_texture_dimension_2d as usize;
-        let egui_state = EguiWinitState::new(egui_ctx.clone(), egui::viewport::ViewportId::ROOT, window, Some(scale_factor as f32), Some(max_texture_side));
+        let mut egui_state = EguiWinitState::new(window);
+        egui_state.set_max_texture_side(max_texture_side);
+        egui_state.set_pixels_per_point(scale_factor as f32);
        
         let egui_wgpu_renderer = EguiWgpuRenderer::new(
             &wgpu_context.device,
@@ -132,7 +134,7 @@ impl Renderer {
         let full_output = self.egui_ctx.end_frame();
         self.egui_state.handle_platform_output(window, &self.egui_ctx, full_output.platform_output);
         
-        let paint_jobs = self.egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
+        let paint_jobs = self.egui_ctx.tessellate(full_output.shapes);
 
         // Crear encoder de comandos
         let mut encoder = self.wgpu_context.device.create_command_encoder(&CommandEncoderDescriptor {

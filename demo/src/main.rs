@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
                     eprintln!("Error al renderizar: {:?}", e);
                     // Handle specific errors like SurfaceError::Lost if necessary
                     if let Some(wgpu::SurfaceError::Lost) = e.downcast_ref::<wgpu::SurfaceError>() {
-                        engine.resize(engine.renderer.surface_manager.config.width, engine.renderer.surface_manager.config.height);
+                        engine.resize(engine.renderer.surface_manager.width(), engine.renderer.surface_manager.height());
                     } else if let Some(wgpu::SurfaceError::OutOfMemory) = e.downcast_ref::<wgpu::SurfaceError>() {
                         *control_flow = ControlFlow::ExitWithCode(1); // Or specific exit for OOM
                     }

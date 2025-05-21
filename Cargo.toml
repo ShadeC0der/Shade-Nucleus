@@ -9,6 +9,6 @@ pollster   = "0.3"
 anyhow     = "1"
 log        = "0.4"
 env_logger = "0.11"
-egui       = "0.26"
-egui-wgpu  = { version = "0.26", features = ["wgpu_0_17"] }
-egui-winit = "0.26"
+egui       = "0.23.0"
+egui-wgpu  = { version = "0.23.0", features = ["wgpu_0_17"] }
+egui-winit = "0.23.0"
