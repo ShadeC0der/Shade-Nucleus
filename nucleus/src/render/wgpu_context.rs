@@ -4,7 +4,6 @@ use wgpu::{
     RequestAdapterOptions, Adapter,
 };
 
-
 /// Encapsulates WGPU's core components: Instance, Adapter, Device, and Queue.
 pub struct WgpuContext {
     #[allow(dead_code)] // Instance is not read after creation currently, but is vital
