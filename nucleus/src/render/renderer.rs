@@ -2,50 +2,33 @@
 //! 
 //! Este módulo define el struct `Renderer`, que se encarga de inicializar y controlar 
 //! los recursos gráficos necesarios para mostrar algo en pantalla usando `wgpu`. 
-//! 
-//! Su responsabilidad principal es:
-//! - Orquestar la inicialización de los componentes de renderizado (`WgpuContext`, `SurfaceManager`).
-//! - Proveer funciones para redimensionar la superficie de dibujo y para ejecutar el ciclo de renderizado.
-//! - Encapsular la lógica de los pases de render (por ahora, un simple pase de limpieza).
-//! 
-//! En resumen, `Renderer` es el componente encargado de preparar y ejecutar 
-//! el proceso de dibujo en una ventana gráfica, encapsulando los detalles de bajo nivel
-//! relacionados con la GPU y la API de gráficos multiplataforma.
-//!
-//! Este módulo es autónomo: otros componentes del motor como (`Engine`) lo usan 
-//! para delegar la tarea de renderizado, sin necesidad de conocer los detalles técnicos.
-//! 
-//! En el futuror ender solo debe controlar el frame, resize y recibir una configuracion de gpu
 
-// Interactua con la GPU, funciona con (Vulkan, DirectX 12, Metal, OpenGL)
 use wgpu::{
-    // Ejemplo para el render
-    TextureViewDescriptor,
-    Color,
-    CommandEncoderDescriptor,
-    RenderPassDescriptor,
-    RenderPassColorAttachment,
-    Operations,
-    LoadOp
+    TextureViewDescriptor, Color, CommandEncoderDescriptor,
+    RenderPassDescriptor, RenderPassColorAttachment, Operations, LoadOp,
 };
 
-// Crea Ventanas (Multiplataforma)
 use winit::window::Window;
-
-// Errores Genericos
 use anyhow::Result;
 
 use super::wgpu_context::WgpuContext;
 use super::surface_manager::SurfaceManager;
 
-// Estructura que agrupa Herramientas
+// egui
+use egui::{Context as EguiContext, Visuals};
+use egui_wgpu::renderer::{Renderer as EguiWgpuRenderer, ScreenDescriptor};
+use egui_winit::State as EguiWinitState;
+
 pub struct Renderer {
     wgpu_context: WgpuContext,
     surface_manager: SurfaceManager,
+    pub egui_ctx: EguiContext,
+    pub egui_state: EguiWinitState,
+    egui_wgpu_renderer: EguiWgpuRenderer,
 }
 
 impl Renderer {
-    /// Inicializa el renderizador (GPU + área de dibujo).
+    /// Inicializa el renderizador y contexto gráfico.
     pub async fn new(window: &Window) -> Result<Self> {
         let wgpu_context = WgpuContext::new().await?;
         let surface_manager = SurfaceManager::new(
@@ -55,22 +38,64 @@ impl Renderer {
             &wgpu_context.device,
         )?;
 
-        // Retorno del Renderer con todo listo para usar
-        Ok(Self { wgpu_context, surface_manager})
+        let egui_ctx = EguiContext::default();
+        egui_ctx.set_visuals(Visuals::dark());
+
+        let scale_factor = window.scale_factor();
+        let max_texture_side = wgpu_context.device.limits().max_texture_dimension_2d as usize;
+
+        let mut egui_state = EguiWinitState::new(window);
+        egui_state.set_max_texture_side(max_texture_side);
+        egui_state.set_pixels_per_point(scale_factor as f32);
+
+        let egui_wgpu_renderer = EguiWgpuRenderer::new(
+            &wgpu_context.device,
+            surface_manager.surface_format(),
+            None,
+            1,
+        );
+
+        Ok(Self {
+            wgpu_context,
+            surface_manager,
+            egui_ctx,
+            egui_state,
+            egui_wgpu_renderer,
+        })
     }
 
-    /// Cambia tamaño de la superficie gráfica.
+    /// Redimensiona el área de dibujo.
     pub fn resize(&mut self, width: u32, height: u32) {
         self.surface_manager.resize(&self.wgpu_context.device, width, height);
     }
 
-    /// Dibuja un frame con un color variable.
-    pub fn render(&mut self, clear_t: f32) -> Result<()> {
-        // Obtener el frame actual
+    /// Dibuja un frame con un color variable y una interfaz `egui`.
+    pub fn render(
+        &mut self,
+        clear_t: f32,
+        window: &Window,
+        fps: f32,
+        gpu_name: &str,
+    ) -> Result<()> {
+        let raw_input = self.egui_state.take_egui_input(window);
+        self.egui_ctx.begin_frame(raw_input);
+
+        // Panel simple de diagnóstico
+        egui::Window::new("Debug Info").show(&self.egui_ctx, |ui| {
+            ui.label(format!("FPS: {:.1}", fps));
+            ui.label(format!("GPU: {}", gpu_name));
+            ui.label(format!("Clear Color t: {:.2}", clear_t));
+        });
+
+        let full_output = self.egui_ctx.end_frame();
+        self.egui_state
+            .handle_platform_output(window, &self.egui_ctx, full_output.platform_output);
+
+        let paint_jobs = self.egui_ctx.tessellate(full_output.shapes);
+
         let frame = self.surface_manager.get_current_texture()?;
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
 
-        // Calcular el color del fondo
         let color = Color {
             r: clear_t as f64,
             g: (1.0 - clear_t) as f64,
@@ -78,15 +103,44 @@ impl Renderer {
             a: 1.0,
         };
 
-        // Crear encoder de comandos
-        let mut encoder = self.wgpu_context.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Main Encoder"),
-        });
+        let mut encoder = self
+            .wgpu_context
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("Main Encoder"),
+            });
 
-        // Iniciar el render pass correctamente (esto asegura las transiciones necesarias)
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [
+                self.surface_manager.width(),
+                self.surface_manager.height(),
+            ],
+            pixels_per_point: window.scale_factor() as f32,
+        };
+
+        for (id, delta) in &full_output.textures_delta.set {
+            self.egui_wgpu_renderer.update_texture(
+                &self.wgpu_context.device,
+                &self.wgpu_context.queue,
+                *id,
+                delta,
+            );
+        }
+        for id in &full_output.textures_delta.free {
+            self.egui_wgpu_renderer.free_texture(id);
+        }
+
+        self.egui_wgpu_renderer.update_buffers(
+            &self.wgpu_context.device,
+            &self.wgpu_context.queue,
+            &mut encoder,
+            &paint_jobs,
+            &screen_descriptor,
+        );
+
         {
-            let _render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-                label: Some("Clear Pass"),
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Clear Pass + Egui Render"),
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -97,13 +151,31 @@ impl Renderer {
                 })],
                 depth_stencil_attachment: None,
             });
+
+            self.egui_wgpu_renderer
+                .render(&mut render_pass, &paint_jobs, &screen_descriptor);
         }
 
-        // Enviar comandos a la GPU y mostrar el resultado
-        self.wgpu_context.queue.submit(std::iter::once(encoder.finish()));
+        self.wgpu_context
+            .queue
+            .submit(std::iter::once(encoder.finish()));
         frame.present();
 
-      Ok(())
+        Ok(())
     }
 
+    /// Devuelve el nombre de la GPU utilizada.
+    pub fn gpu_name(&self) -> String {
+        self.wgpu_context.adapter.get_info().name.clone()
+    }
+
+    /// Devuelve el ancho actual de la superficie gráfica.
+    pub fn surface_width(&self) -> u32 {
+        self.surface_manager.width()
+    }
+
+    /// Devuelve el alto actual de la superficie gráfica.
+    pub fn surface_height(&self) -> u32 {
+        self.surface_manager.height()
+    }
 }

@@ -7,8 +7,6 @@ use anyhow::Context;
 use nucleus::Engine;
 use pollster::block_on;
 
-
-
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
@@ -26,26 +24,44 @@ fn main() -> anyhow::Result<()> {
         *control_flow = ControlFlow::Poll;
 
         match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested =>
-                    *control_flow = ControlFlow::ExitWithCode(0),
+            Event::WindowEvent { event, window_id } if window_id == window.id() => {
+                // ✅ Usamos on_event con el contexto de egui
+                let egui_consumed_event =
+                    engine.renderer.egui_state.on_event(&engine.renderer.egui_ctx, &event);
+                if egui_consumed_event.consumed {
+                    return;
+                }
 
-                WindowEvent::Resized(sz) =>
-                    engine.resize(sz.width, sz.height),
+                match event {
+                    WindowEvent::CloseRequested =>
+                        *control_flow = ControlFlow::ExitWithCode(0),
 
-                WindowEvent::ScaleFactorChanged { new_inner_size, .. } =>
-                    engine.resize(new_inner_size.width, new_inner_size.height),
+                    WindowEvent::Resized(sz) =>
+                        engine.resize(sz.width, sz.height),
 
-                _ => {}
-            },
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } =>
+                        engine.resize(new_inner_size.width, new_inner_size.height),
+
+                    _ => {}
+                }
+            }
 
             Event::MainEventsCleared => {
                 engine.update();
 
-                // Aquí claramente manejas cualquier error usando anyhow:
-                if let Err(e) = engine.render() {
+                if let Err(e) = engine.render(&window) {
                     eprintln!("Error al renderizar: {:?}", e);
-                    *control_flow = ControlFlow::ExitWithCode(1);
+
+                    if let Some(wgpu::SurfaceError::Lost) = e.downcast_ref::<wgpu::SurfaceError>() {
+                        engine.resize(
+                            engine.renderer.surface_width(),
+                            engine.renderer.surface_height(),
+                        );
+                    } else if let Some(wgpu::SurfaceError::OutOfMemory) =
+                        e.downcast_ref::<wgpu::SurfaceError>()
+                    {
+                        *control_flow = ControlFlow::ExitWithCode(1);
+                    }
                 }
             }
 
