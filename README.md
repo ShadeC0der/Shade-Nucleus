@@ -1,8 +1,8 @@
 # Shade Nucleus
 
-*Motor gráfico 2D escrito en Rust — creado totalmente desde cero.*
+*Motor gráfico escrito en Rust.*
 
-> **Estado actual:** prototipo funcional (`v0.2.0`)  
+> **Estado actual:** prototipo funcional (`v0.2.2`)  
 > **Estructura:** `nucleus/` (núcleo del motor) + `demo/` (ejecutable de prueba)
 
 ---
@@ -26,13 +26,23 @@
 
 ## 🚀 Cómo compilar y ejecutar
 
-En la ruta `/demo` ejecutar los siguientes comandos:
-
+- Compilar todo el workspace
 ```bash
-# Compilar todo el workspace
 cargo build
 ```
+
+- Ejecutar la demo básica
 ```bash
-# Ejecutar la demo básica
 cargo run -p demo
+```
+
+## 🛠️ Alternativa: usar Docker
+
+- Construir la imagen del proyecto (compila en modo release)
+```bash
+docker build -t shade-nucleus .
+```
+- Ejecutar el contenedor (sin soporte gráfico en Windows)
+```bash
+docker run --rm shade-nucleus
 ```
