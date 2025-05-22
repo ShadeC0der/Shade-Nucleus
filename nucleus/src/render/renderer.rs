@@ -1,8 +1,3 @@
-//! renderer.rs
-//! 
-//! Este módulo define el struct `Renderer`, que se encarga de inicializar y controlar 
-//! los recursos gráficos necesarios para mostrar algo en pantalla usando `wgpu`. 
-
 use wgpu::{
     TextureViewDescriptor, Color, CommandEncoderDescriptor,
     RenderPassDescriptor, RenderPassColorAttachment, Operations, LoadOp,
@@ -13,18 +8,12 @@ use anyhow::Result;
 
 use super::wgpu_context::WgpuContext;
 use super::surface_manager::SurfaceManager;
-
-// egui
-use egui::{Context as EguiContext, Visuals};
-use egui_wgpu::renderer::{Renderer as EguiWgpuRenderer, ScreenDescriptor};
-use egui_winit::State as EguiWinitState;
+use super::ui::UiRenderer;
 
 pub struct Renderer {
     wgpu_context: WgpuContext,
     surface_manager: SurfaceManager,
-    pub egui_ctx: EguiContext,
-    pub egui_state: EguiWinitState,
-    egui_wgpu_renderer: EguiWgpuRenderer,
+    pub ui: UiRenderer,
 }
 
 impl Renderer {
@@ -38,29 +27,12 @@ impl Renderer {
             &wgpu_context.device,
         )?;
 
-        let egui_ctx = EguiContext::default();
-        egui_ctx.set_visuals(Visuals::dark());
-
-        let scale_factor = window.scale_factor();
-        let max_texture_side = wgpu_context.device.limits().max_texture_dimension_2d as usize;
-
-        let mut egui_state = EguiWinitState::new(window);
-        egui_state.set_max_texture_side(max_texture_side);
-        egui_state.set_pixels_per_point(scale_factor as f32);
-
-        let egui_wgpu_renderer = EguiWgpuRenderer::new(
-            &wgpu_context.device,
-            surface_manager.surface_format(),
-            None,
-            1,
-        );
+        let ui = UiRenderer::new(window, &wgpu_context.device, surface_manager.surface_format());
 
         Ok(Self {
             wgpu_context,
             surface_manager,
-            egui_ctx,
-            egui_state,
-            egui_wgpu_renderer,
+            ui,
         })
     }
 
@@ -77,21 +49,36 @@ impl Renderer {
         fps: f32,
         gpu_name: &str,
     ) -> Result<()> {
-        let raw_input = self.egui_state.take_egui_input(window);
-        self.egui_ctx.begin_frame(raw_input);
+        self.ui.begin_frame(window);
 
         // Panel simple de diagnóstico
-        egui::Window::new("Debug Info").show(&self.egui_ctx, |ui| {
+        egui::Window::new("Debug Info").show(&self.ui.ctx, |ui| {
             ui.label(format!("FPS: {:.1}", fps));
             ui.label(format!("GPU: {}", gpu_name));
             ui.label(format!("Clear Color t: {:.2}", clear_t));
+            ui.label(format!(
+                "Resolución: {} x {}",
+                self.surface_manager.width(),
+                self.surface_manager.height()
+            ));
+            ui.label(format!(
+                "Formato de superficie: {:?}",
+                self.surface_manager.surface_format()
+            ));
+            ui.label(format!(
+                "Backend: {:?}",
+                self.wgpu_context.adapter.get_info().backend
+            ));
         });
 
-        let full_output = self.egui_ctx.end_frame();
-        self.egui_state
-            .handle_platform_output(window, &self.egui_ctx, full_output.platform_output);
-
-        let paint_jobs = self.egui_ctx.tessellate(full_output.shapes);
+        let (paint_jobs, screen_descriptor) = self.ui.end_frame(
+            window,
+            &self.wgpu_context.device,
+            &self.wgpu_context.queue,
+            &mut self.wgpu_context.device.create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("PreEncoder"), // temporal
+            }),
+        );
 
         let frame = self.surface_manager.get_current_texture()?;
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
@@ -110,34 +97,6 @@ impl Renderer {
                 label: Some("Main Encoder"),
             });
 
-        let screen_descriptor = ScreenDescriptor {
-            size_in_pixels: [
-                self.surface_manager.width(),
-                self.surface_manager.height(),
-            ],
-            pixels_per_point: window.scale_factor() as f32,
-        };
-
-        for (id, delta) in &full_output.textures_delta.set {
-            self.egui_wgpu_renderer.update_texture(
-                &self.wgpu_context.device,
-                &self.wgpu_context.queue,
-                *id,
-                delta,
-            );
-        }
-        for id in &full_output.textures_delta.free {
-            self.egui_wgpu_renderer.free_texture(id);
-        }
-
-        self.egui_wgpu_renderer.update_buffers(
-            &self.wgpu_context.device,
-            &self.wgpu_context.queue,
-            &mut encoder,
-            &paint_jobs,
-            &screen_descriptor,
-        );
-
         {
             let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
                 label: Some("Clear Pass + Egui Render"),
@@ -152,8 +111,7 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
 
-            self.egui_wgpu_renderer
-                .render(&mut render_pass, &paint_jobs, &screen_descriptor);
+            self.ui.render(&mut render_pass, &paint_jobs, &screen_descriptor);
         }
 
         self.wgpu_context

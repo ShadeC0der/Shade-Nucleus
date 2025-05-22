@@ -25,9 +25,10 @@ fn main() -> anyhow::Result<()> {
 
         match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                // ✅ Usamos on_event con el contexto de egui
+                // Guardar el contexto antes del préstamo mutable
+                let ctx = engine.renderer.ui.ctx.clone();
                 let egui_consumed_event =
-                    engine.renderer.egui_state.on_event(&engine.renderer.egui_ctx, &event);
+                    engine.renderer.ui.on_event(&ctx, &event);
                 if egui_consumed_event.consumed {
                     return;
                 }
