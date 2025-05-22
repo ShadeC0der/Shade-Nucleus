@@ -8,7 +8,8 @@ use anyhow::Result;
 
 use super::wgpu_context::WgpuContext;
 use super::surface_manager::SurfaceManager;
-use super::ui::UiRenderer;
+use super::ui_diagnostic::UiRenderer;
+use super::ui_diagnostic_logic::draw_diagnostics;
 
 pub struct Renderer {
     wgpu_context: WgpuContext,
@@ -38,10 +39,11 @@ impl Renderer {
 
     /// Redimensiona el área de dibujo.
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.surface_manager.resize(&self.wgpu_context.device, width, height);
+        self.surface_manager
+            .resize(&self.wgpu_context.device, width, height);
     }
 
-    /// Dibuja un frame con un color variable y una interfaz `egui`.
+    /// Dibuja un frame con UI y fondo animado.
     pub fn render(
         &mut self,
         clear_t: f32,
@@ -51,33 +53,28 @@ impl Renderer {
     ) -> Result<()> {
         self.ui.begin_frame(window);
 
-        // Panel simple de diagnóstico
-        egui::Window::new("Debug Info").show(&self.ui.ctx, |ui| {
-            ui.label(format!("FPS: {:.1}", fps));
-            ui.label(format!("GPU: {}", gpu_name));
-            ui.label(format!("Clear Color t: {:.2}", clear_t));
-            ui.label(format!(
-                "Resolución: {} x {}",
-                self.surface_manager.width(),
-                self.surface_manager.height()
-            ));
-            ui.label(format!(
-                "Formato de superficie: {:?}",
-                self.surface_manager.surface_format()
-            ));
-            ui.label(format!(
-                "Backend: {:?}",
-                self.wgpu_context.adapter.get_info().backend
-            ));
-        });
+        // Lógica separada para lo que se dibuja (UI)
+        draw_diagnostics(
+            &self.ui.ctx,
+            fps,
+            gpu_name,
+            clear_t,
+            self.surface_manager.width(),
+            self.surface_manager.height(),
+            &format!("{:?}", self.surface_manager.surface_format()),
+            &format!("{:?}", self.wgpu_context.adapter.get_info().backend),
+        );
 
         let (paint_jobs, screen_descriptor) = self.ui.end_frame(
             window,
             &self.wgpu_context.device,
             &self.wgpu_context.queue,
-            &mut self.wgpu_context.device.create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("PreEncoder"), // temporal
-            }),
+            &mut self
+                .wgpu_context
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor {
+                    label: Some("PreEncoder"),
+                }),
         );
 
         let frame = self.surface_manager.get_current_texture()?;
@@ -111,7 +108,8 @@ impl Renderer {
                 depth_stencil_attachment: None,
             });
 
-            self.ui.render(&mut render_pass, &paint_jobs, &screen_descriptor);
+            self.ui
+                .render(&mut render_pass, &paint_jobs, &screen_descriptor);
         }
 
         self.wgpu_context
@@ -127,12 +125,10 @@ impl Renderer {
         self.wgpu_context.adapter.get_info().name.clone()
     }
 
-    /// Devuelve el ancho actual de la superficie gráfica.
     pub fn surface_width(&self) -> u32 {
         self.surface_manager.width()
     }
 
-    /// Devuelve el alto actual de la superficie gráfica.
     pub fn surface_height(&self) -> u32 {
         self.surface_manager.height()
     }
