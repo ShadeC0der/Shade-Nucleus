@@ -1,0 +1,7 @@
+target/
+.git/
+.vscode/
+*.rs.bk
+*.log
+.DS_Store
+Cargo.lock
