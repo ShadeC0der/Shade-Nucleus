@@ -4,10 +4,8 @@ version = "0.2.5"
 edition = "2021"
 
 [dependencies]
-winit      = { workspace = true }
-wgpu       = { workspace = true }
-anyhow     = { workspace = true }
-log        = { workspace = true }
-egui       = { workspace = true }
-egui-wgpu  = { workspace = true }
-egui-winit = { workspace = true }
+winit = { workspace = true }
+wgpu = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+

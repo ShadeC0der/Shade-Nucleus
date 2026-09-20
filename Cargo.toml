@@ -3,12 +3,10 @@ members = ["nucleus", "demo"]
 resolver = "3"
 
 [workspace.dependencies]
-winit      = "0.28"
-wgpu       = "0.17"
-pollster   = "0.3"
-anyhow     = "1"
-log        = "0.4"
+winit = "0.30.13"
+wgpu = "30.0.1"
+pollster = "1.0.1"
+anyhow = "1.0.104"
+log = "0.4.34"
 env_logger = "0.11"
-egui       = "0.23.0"
-egui-wgpu  = "0.23.0"
-egui-winit = "0.23.0"
+
