@@ -3,10 +3,33 @@ members = ["nucleus", "demo"]
 resolver = "3"
 
 [workspace.dependencies]
-winit = "0.30.13"
-wgpu = "30.0.1"
+# Sin `wayland-csd-adwaita`: las decoraciones las dibuja el compositor.
+# Eso evita arrastrar tiny-skia y ttf-parser solo para la barra de título.
+winit = { version = "0.30.13", default-features = false, features = [
+    "rwh_06",
+    "x11",
+    "wayland",
+    "wayland-dlopen",
+] }
+# Sin backends por defecto: cada sistema activa el suyo en nucleus/Cargo.toml
+wgpu = { version = "30.0.1", default-features = false, features = [
+    "std",
+    "parking_lot",
+    "wgsl",
+] }
 pollster = "1.0.1"
 anyhow = "1.0.104"
 log = "0.4.34"
-env_logger = "0.11"
+# Sin `regex`: los filtros por patrón traían un motor completo de expresiones
+# regulares (~600 KB). Siguen funcionando RUST_LOG=info y RUST_LOG=nucleus=debug.
+env_logger = { version = "0.11", default-features = false, features = [
+    "auto-color",
+    "humantime",
+] }
 
+# Perfil de publicación, afinado para que el binario pese lo menos posible
+[profile.release]
+strip = true           # Fuera los símbolos de depuración
+lto = true             # Optimiza entre crates, no solo dentro de cada uno
+codegen-units = 1      # Una sola unidad: el optimizador ve el programa entero
+panic = "abort"        # Sin desenrollado de pila: al fallar, se aborta
