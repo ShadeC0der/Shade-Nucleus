@@ -1,48 +1,99 @@
 # Shade Nucleus
 
-*Motor gráfico escrito en Rust.*
+*Motor gráfico escrito en Rust, sobre `winit` y `wgpu`.*
 
-> **Estado actual:** prototipo funcional (`v0.2.2`)  
-> **Estructura:** `nucleus/` (núcleo del motor) + `demo/` (ejecutable de prueba)
-
----
-
-## 🚧 ¿Qué incluye esta versión?
-
-| Carpeta      | Rol                                                                 |
-|--------------|----------------------------------------------------------------------|
-| **nucleus/** | Crate **lib** con el núcleo gráfico: configuración de GPU, ventana, surface, renderer y motor base (`Engine`). |
-| **demo/**    | Crate **bin** de prueba. Muestra una ventana con un color animado dinámicamente. Sirve como punto de partida para futuras escenas. |
+> **Estado:** `v0.3.0` — abre una ventana con un fondo animado.
+> Todavía no dibuja geometría propia: no hay shaders ni pipelines.
 
 ---
 
-## 🎯 Objetivo actual
+## Estructura
 
-- Establecer una arquitectura modular y escalable.
-- Separar la lógica (`Engine`) del renderizado (`Renderer`).
-- Preparar el entorno para futuras escenas, perfiles gráficos y lógica avanzada.
+| Carpeta | Rol |
+|---|---|
+| **nucleus/** | Crate **lib**: el núcleo gráfico. Contexto de GPU, superficie, renderer y el motor (`Engine`). |
+| **demo/** | Crate **bin**: ejecutable de prueba. Abre una ventana con un fondo que cambia de color. |
+
+Dentro de `nucleus/src`:
+
+| Módulo | Qué hace |
+|---|---|
+| `core/engine.rs` | El motor: mide el tiempo, cuenta fotogramas y pide dibujar. |
+| `render/wgpu_context.rs` | Instancia, adaptador, dispositivo y cola de wgpu. |
+| `render/surface_manager.rs` | La superficie de la ventana y su configuración. |
+| `render/renderer.rs` | Arma y envía cada fotograma. |
+| `utils/messages.rs` | Mensajes de error. |
 
 ---
 
-## 🚀 Cómo compilar y ejecutar
+## Cómo compilar y ejecutar
 
-- Compilar todo el workspace
 ```bash
-cargo build
+cargo build          # compila el workspace
+cargo run -p demo    # ejecuta la demo
 ```
 
-- Ejecutar la demo básica
+Para ver los mensajes de registro:
+
 ```bash
-cargo run -p demo
+RUST_LOG=info cargo run -p demo
 ```
 
-## 🛠️ Alternativa: usar Docker
+### Compilación de publicación
 
-- Construir la imagen del proyecto (compila en modo release)
+```bash
+cargo build --release
+```
+
+El perfil de release está afinado para que el binario pese lo menos posible:
+`strip`, LTO, una sola unidad de generación de código y aborto en caso de
+`panic`. Resultado actual: **5,05 MB**, frente a los 12,30 MB del perfil por
+defecto.
+
+---
+
+## Requisitos
+
+| | |
+|---|---|
+| Rust | 1.98 o superior (edición 2024) |
+| Linux | Vulkan. Funciona sobre Wayland y X11 |
+| Windows | DirectX 12 o Vulkan |
+| macOS | Metal |
+
+Cada sistema compila únicamente su backend gráfico, declarado por objetivo en
+`nucleus/Cargo.toml`.
+
+> En Wayland las decoraciones de ventana las dibuja el compositor: el motor no
+> incluye decoraciones del lado del cliente.
+
+---
+
+## Estado y próximos pasos
+
+Lo que ya funciona:
+
+- Ventana, bucle de eventos y redimensionado.
+- Contexto de GPU completo y superficie configurada.
+- Fondo animado por tiempo transcurrido, sincronizado con la pantalla.
+- Contador de fotogramas por segundo.
+
+Lo siguiente:
+
+1. Primer shader en WGSL y su pipeline: dibujar un triángulo.
+2. Dibujar muchos rectángulos con instanciación.
+3. Exponer el estado del teclado.
+4. Texturas y atlas de fuente.
+5. Una rejilla de glifos.
+
+---
+
+## Alternativa: compilar con Docker
+
+Compila el ejecutable en release dentro de un entorno limpio. **No sirve para
+ejecutar el juego**: un contenedor no tiene acceso a la pantalla ni a la GPU sin
+configuración adicional.
+
 ```bash
 docker build -t shade-nucleus .
-```
-- Ejecutar el contenedor (sin soporte gráfico en Windows)
-```bash
-docker run --rm shade-nucleus
 ```
