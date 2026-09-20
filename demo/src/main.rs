@@ -25,14 +25,6 @@ fn main() -> anyhow::Result<()> {
 
         match event {
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                // Guardar el contexto antes del préstamo mutable
-                let ctx = engine.renderer.ui.ctx.clone();
-                let egui_consumed_event =
-                    engine.renderer.ui.on_event(&ctx, &event);
-                if egui_consumed_event.consumed {
-                    return;
-                }
-
                 match event {
                     WindowEvent::CloseRequested =>
                         *control_flow = ControlFlow::ExitWithCode(0),
@@ -50,7 +42,7 @@ fn main() -> anyhow::Result<()> {
             Event::MainEventsCleared => {
                 engine.update();
 
-                if let Err(e) = engine.render(&window) {
+                if let Err(e) = engine.render() {
                     eprintln!("Error al renderizar: {:?}", e);
 
                     if let Some(wgpu::SurfaceError::Lost) = e.downcast_ref::<wgpu::SurfaceError>() {

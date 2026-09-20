@@ -50,9 +50,13 @@ impl Engine {
     }
 
     /// Solicita al renderer que dibuje el frame actual.
-    pub fn render(&mut self, window: &Window) -> Result<()> {
-        let gpu_name = self.renderer.gpu_name(); // ✅ Usamos el método público
-        self.renderer.render(self.clear_t, window, self.current_fps, &gpu_name)
+    pub fn render(&mut self) -> Result<()> {
+        self.renderer.render(self.clear_t)
+    }
+
+    /// FPS medidos en el último segundo.
+    pub fn fps(&self) -> f32 {
+        self.current_fps
     }
 
 }
