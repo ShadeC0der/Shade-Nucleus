@@ -1,13 +1,14 @@
 use wgpu::{
-    TextureViewDescriptor, Color, CommandEncoderDescriptor,
-    RenderPassDescriptor, RenderPassColorAttachment, Operations, LoadOp,
+    Color, CommandEncoderDescriptor, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDescriptor, StoreOp, TextureViewDescriptor,
 };
 
-use winit::window::Window;
 use anyhow::Result;
+use std::sync::Arc;
+use winit::window::Window;
 
-use super::wgpu_context::WgpuContext;
 use super::surface_manager::SurfaceManager;
+use super::wgpu_context::WgpuContext;
 
 pub struct Renderer {
     wgpu_context: WgpuContext,
@@ -16,10 +17,10 @@ pub struct Renderer {
 
 impl Renderer {
     /// Inicializa el renderizador y contexto gráfico.
-    pub async fn new(window: &Window) -> Result<Self> {
+    pub async fn new(window: Arc<Window>) -> Result<Self> {
         let wgpu_context = WgpuContext::new().await?;
         let surface_manager = SurfaceManager::new(
-            window,
+            window.clone(),
             &wgpu_context.instance,
             &wgpu_context.adapter,
             &wgpu_context.device,
@@ -42,19 +43,24 @@ impl Renderer {
         let frame = self.surface_manager.get_current_texture()?;
         let view = frame.texture.create_view(&TextureViewDescriptor::default());
 
+        // Tres ondas desfasadas un tercio de vuelta: el color recorre el círculo
+        // cromático y vuelve al punto de partida sin dar ningún salto brusco.
+        let turn = clear_t as f64 * std::f64::consts::TAU;
+        let wave = |phase: f64| 0.5 + 0.5 * (turn + phase).sin();
+
         let color = Color {
-            r: clear_t as f64,
-            g: (1.0 - clear_t) as f64,
-            b: (clear_t * 0.5) as f64,
+            r: wave(0.0),
+            g: wave(std::f64::consts::TAU / 3.0),
+            b: wave(2.0 * std::f64::consts::TAU / 3.0),
             a: 1.0,
         };
 
-        let mut encoder = self
-            .wgpu_context
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Main Encoder"),
-            });
+        let mut encoder =
+            self.wgpu_context
+                .device
+                .create_command_encoder(&CommandEncoderDescriptor {
+                    label: Some("Main Encoder"),
+                });
 
         {
             let _render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
@@ -62,12 +68,14 @@ impl Renderer {
                 color_attachments: &[Some(RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
+                    depth_slice: None,
                     ops: Operations {
                         load: LoadOp::Clear(color),
-                        store: true,
+                        store: StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
+                ..Default::default()
             });
 
             // Por ahora el pase solo limpia la pantalla: no dibuja nada más.
@@ -76,7 +84,8 @@ impl Renderer {
         self.wgpu_context
             .queue
             .submit(std::iter::once(encoder.finish()));
-        frame.present();
+        // Presentar ya no es cosa de la textura, sino de la cola
+        self.wgpu_context.queue.present(frame);
 
         Ok(())
     }

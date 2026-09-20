@@ -1,5 +1,6 @@
 use crate::render::renderer::Renderer;
 use anyhow::Result;
+use std::sync::Arc;
 use winit::window::Window;
 use std::time::{Duration, Instant};
 
@@ -14,8 +15,11 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// Cuánto tarda el color de fondo en dar una vuelta completa.
+    const COLOR_CYCLE_SECONDS: f32 = 12.0;
+
     /// Crea el núcleo del motor y el renderer asociado.
-    pub async fn new(window: &Window) -> Result<Self> {
+    pub async fn new(window: Arc<Window>) -> Result<Self> {
         Ok(Self {
             renderer: Renderer::new(window).await?,
             clear_t: 0.0,
@@ -28,11 +32,14 @@ impl Engine {
 
     /// Actualiza la lógica interna (por ahora, solo cambia un color).
     pub fn update(&mut self) {
-        self.clear_t = (self.clear_t + 0.01) % 1.0;
-
         let now = Instant::now();
         let delta_time = now.duration_since(self.last_frame_time);
         self.last_frame_time = now;
+
+        // El color avanza según el tiempo transcurrido, no según los fotogramas:
+        // así tarda siempre lo mismo en dar una vuelta, vaya el equipo rápido o lento.
+        self.clear_t =
+            (self.clear_t + delta_time.as_secs_f32() / Self::COLOR_CYCLE_SECONDS) % 1.0;
 
         self.frame_count += 1;
         self.fps_update_timer += delta_time;

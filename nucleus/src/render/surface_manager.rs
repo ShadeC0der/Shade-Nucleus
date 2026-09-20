@@ -1,19 +1,33 @@
 // Manejo de Errores
 use anyhow::Result;
 // Importaciones necesarias para WGPU
-use wgpu::{ Adapter, Device, Instance, Surface, SurfaceConfiguration, SurfaceError, SurfaceTexture, TextureUsages, TextureFormat };
+use wgpu::{
+    Adapter, CurrentSurfaceTexture, Device, Instance, PresentMode, Surface, SurfaceColorSpace,
+    SurfaceConfiguration, SurfaceTexture, TextureFormat, TextureUsages,
+};
 // Ventana de Winit
+use std::sync::Arc;
 use winit::window::Window;
 
 /// Administra la superficie WGPU y su configuración.
-pub struct SurfaceManager { surface: Surface, config: SurfaceConfiguration }
+pub struct SurfaceManager {
+    surface: Surface<'static>,
+    config: SurfaceConfiguration,
+}
 
 /// Implementa la funcionalidad de la superficie WGPU.
 impl SurfaceManager {
     /// Inicializa la superficie WGPU y la configura para la ventana dada.
-    pub fn new( window: &Window, instance: &Instance, adapter: &Adapter, device: &Device,) -> Result<Self> {
-        // Crear la superficie WGPU a partir de la ventana
-        let surface = unsafe { instance.create_surface(window)? };
+    pub fn new(
+        window: Arc<Window>,
+        instance: &Instance,
+        adapter: &Adapter,
+        device: &Device,
+    ) -> Result<Self> {
+        // Crear la superficie WGPU a partir de la ventana.
+        // La superficie se queda con una copia del Arc, así que la ventana no
+        // puede morir antes que ella: por eso ya no hace falta `unsafe`.
+        let surface = instance.create_surface(window.clone())?;
 
         // Obtener el tamaño de la ventana
         let size = window.inner_size();
@@ -32,12 +46,14 @@ impl SurfaceManager {
         // Configurar la superficie
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT, // Uso de la textura
-            format, // Formato de la textura
-            width: size.width.max(1), // Ancho mínimo de 1
-            height: size.height.max(1), // Largo minimo de 1
-            present_mode: caps.present_modes[0], // Modo de presentación
-            alpha_mode: caps.alpha_modes[0], // Modo alfa
-            view_formats: vec![], // Formatos de vista
+            format,                                  // Formato de la textura
+            width: size.width.max(1),                // Ancho mínimo de 1
+            height: size.height.max(1),              // Largo minimo de 1
+            present_mode: PresentMode::Fifo,         // Sincronizado con la pantalla
+            alpha_mode: caps.alpha_modes[0],         // Modo alfa
+            view_formats: vec![],                    // Formatos de vista
+            color_space: SurfaceColorSpace::Auto,
+            desired_maximum_frame_latency: 2,
         };
 
         // Aplica la configuración a la superficie
@@ -57,16 +73,27 @@ impl SurfaceManager {
     }
 
     /// Recupera la textura actual de la superficie para ser renderizada.
-    pub fn get_current_texture(&self) -> Result<SurfaceTexture, SurfaceError> {
-        self.surface.get_current_texture()
+    pub fn get_current_texture(&self) -> Result<SurfaceTexture> {
+        match self.surface.get_current_texture() {
+            CurrentSurfaceTexture::Success(texture)
+            | CurrentSurfaceTexture::Suboptimal(texture) => Ok(texture),
+            otro => Err(anyhow::anyhow!("no se pudo obtener la textura: {otro:?}")),
+        }
     }
 
     /// Devuelve el formato de textura de la superficie.
-    pub fn surface_format(&self) -> TextureFormat { self.config.format }
+    pub fn surface_format(&self) -> TextureFormat {
+        self.config.format
+    }
 
     /// Devuelve el ancho de la superficie WGPU
-    pub fn width(&self) -> u32 { self.config.width }
+    pub fn width(&self) -> u32 {
+        self.config.width
+    }
 
     /// Devuelve la altura de la superficie WGPU.
-    pub fn height(&self) -> u32 { self.config.height }
+    pub fn height(&self) -> u32 {
+        self.config.height
+    }
 }
+
